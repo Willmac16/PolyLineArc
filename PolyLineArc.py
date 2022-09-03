@@ -4,16 +4,28 @@ import matplotlib.pyplot as plt
 TANGENCY_THRESHOLD = 1e-13
 COINCIDENT_THRESHOLD = 1e-16
 
+def mag_sqr(vector):
+    sum_sqr = vector[0]*vector[0] * 0.0
+
+    for v in vector:
+        sum_sqr += v * v
+
+    return sum_sqr
+
+def mag(vector):
+    return mag_sqr(vector).sqrt()
+
+
 def offset_vector(heading, offset):
     clockwise = np.array(((0, 1),(-1, 0)))
     vec = np.matmul(clockwise, heading)
-    vec *= offset / np.linalg.norm(vec)
+    vec *= offset / mag(vec)
     return vec
 
 class PolyLineArc:
     def __init__(self, next):
         if next != None:
-            if np.linalg.norm(next.start - self.end) < COINCIDENT_THRESHOLD:
+            if mag(next.start - self.end) < COINCIDENT_THRESHOLD:
                 self.next = next
             else:
                 raise Exception("PolyLineArc: next segment must start at end of current segment")
@@ -28,7 +40,7 @@ class PolyLineArc:
             return self.offset_self(None, offset)
 
         # If two segments aren't tangent figure out if we will procede
-        if np.linalg.norm(self.end_heading() - self.next.start_heading()) >= TANGENCY_THRESHOLD:
+        if mag(self.end_heading() - self.next.start_heading()) >= TANGENCY_THRESHOLD:
             # Check if the two segments need a fillet patch or an intersection blend
             heading_delta = self.next.start_heading() - self.end_heading()
 
@@ -135,7 +147,7 @@ class PolyLine(PolyLineArc):
     def length(self):
         delta = self.end - self.start
 
-        return np.linalg.norm(delta)
+        return mag(delta)
 
     def pos(self, t):
         return self.start + (self.end - self.start) * t
@@ -151,7 +163,7 @@ class PolyLine(PolyLineArc):
 
     def heading(self):
         connect_vec = self.end - self.start
-        connect_vec /= np.linalg.norm(connect_vec)
+        connect_vec /= mag(connect_vec)
         return connect_vec
 
     def start_heading(self):
@@ -170,8 +182,8 @@ class PolyLine(PolyLineArc):
                 u = self.start - intersection
                 v = self.next.end - intersection
 
-                u /= np.linalg.norm(u)
-                v /= np.linalg.norm(v)
+                u /= mag(u)
+                v /= mag(v)
 
                 angle = math.acos(np.dot(u, v))
                 trim_length = fillet_radius * math.tan((math.pi - angle) / 2)
@@ -194,7 +206,7 @@ class PolyLine(PolyLineArc):
 
 class PolyArc(PolyLineArc):
     # If radius is defined then ignore center and solve for center given start and end
-    def __init__(self, start: np.ndarray, end: np.ndarray, center: np.ndarray, next: PolyLineArc, radius: float = None):
+    def __init__(self, start: np.ndarray, end: np.ndarray, center: np.ndarray, next: PolyLineArc, radius = None):
         self.start = start
         self.end = end
 
@@ -206,8 +218,8 @@ class PolyArc(PolyLineArc):
             directConnect = end - start
 
             q = np.array((directConnect[1]*-1, directConnect[0]))
-            q /= np.linalg.norm(q)
-            q *= -1 * math.sqrt(radius**2 - (np.linalg.norm(directConnect)/2)**2)
+            q /= mag(q)
+            q *= -1 * (radius**2 - (mag(directConnect)/2)**2).sqrt()
 
             self.center = start + directConnect/2 + q
 
@@ -231,14 +243,14 @@ class PolyArc(PolyLineArc):
 
         working_angle = angle * t
 
-        rot_matrix = np.array(((np.cos(working_angle), -np.sin(working_angle)), (np.sin(working_angle), np.cos(working_angle))))
+        rot_matrix = np.array(((math.cos(working_angle), -math.sin(working_angle)), (math.sin(working_angle), math.cos(working_angle))))
 
         return self.center + np.matmul(rot_matrix, start_radius)
 
     def pos_prime(self, t):
         working_angle = self.angle() * t
 
-        rot_matrix = np.array(((np.cos(working_angle), -np.sin(working_angle)), (np.sin(working_angle), np.cos(working_angle))))
+        rot_matrix = np.array(((math.cos(working_angle), -math.sin(working_angle)), (math.sin(working_angle), math.cos(working_angle))))
 
         return np.matmul(rot_matrix, self.start_heading())
 
@@ -258,7 +270,7 @@ class PolyArc(PolyLineArc):
 
     def start_heading(self):
         r_start = self.start - self.center
-        r_start /= np.linalg.norm(r_start)
+        r_start /= mag(r_start)
 
         r_start *= self.turn_handedness()
 
@@ -268,7 +280,7 @@ class PolyArc(PolyLineArc):
 
     def end_heading(self):
         r_end = self.end - self.center
-        r_end /= np.linalg.norm(r_end)
+        r_end /= mag(r_end)
 
         r_end *= self.turn_handedness()
 
@@ -277,7 +289,7 @@ class PolyArc(PolyLineArc):
         return np.matmul(rotate, r_end)
 
     def radius(self):
-        return np.linalg.norm(self.center - self.start)
+        return mag(self.center - self.start)
 
 
 
