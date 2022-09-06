@@ -32,7 +32,7 @@ class PolyLineArc:
         return
 
     # Offset is a signed float ninety degrees to the right of heading
-    def offset(self, offset: float):
+    def offset(self, offset):
 
         end_offset_vector = offset_vector(self.end_heading(), offset)
 
@@ -94,8 +94,8 @@ class PolyLineArc:
 
         for t in np.arange(0, 1.01, 0.01):
             pos = self.pos(t)
-            xs.append(pos[0])
-            ys.append(pos[1])
+            xs.append(pos[0].__value__())
+            ys.append(pos[1].__value__())
 
         if self.next is not None:
             n_xs, n_ys = self.next.plot_vals()
@@ -134,6 +134,21 @@ class PolyLineArc:
             return 1
         else:
             return 1 + self.next.num_segments()
+
+    # Abstract func
+    def reverse_seg(self, next=None):
+        pass
+
+    # Returns a new PolyLineArc with the same shape as self just going the other direction
+    def reverse(self, next=None):
+        tip = self.reverse_seg(next)
+        if self.next is not None:
+            return self.next.reverse(tip)
+        else:
+            return next
+
+
+
 
 class PolyLine(PolyLineArc):
     def __init__(self, start: np.ndarray, end: np.ndarray, next: PolyLineArc):
@@ -201,7 +216,8 @@ class PolyLine(PolyLineArc):
                 # print("line to fillet", np.equal(self.end, self.next.start).all())
                 # print("fillet to line", np.equal(self.next.end, self.next.next.start).all())
 
-
+    def reverse_seg(self, next=None):
+        return PolyLine(self.end, self.start, next)
 
 
 class PolyArc(PolyLineArc):
@@ -290,6 +306,9 @@ class PolyArc(PolyLineArc):
 
     def radius(self):
         return mag(self.center - self.start)
+
+    def reverse_self(self, next=None):
+        return PolyArc(self.end, self.start, self.center, next)
 
 
 
